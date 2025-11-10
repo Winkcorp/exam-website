@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>응시 페이지</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 860px; margin: 32px auto; padding: 0 16px; }
+    .q { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin: 10px 0; }
+    input[type="text"] { width: 180px; padding: 6px; }
+    .ok { color: #059669; } .no { color: #dc2626; }
+    .row { display:flex; gap:8px; align-items:center; margin-bottom: 12px; }
+    .btn { padding: 8px 12px; border-radius: 8px; border: 1px solid #d1d5db; text-decoration: none; display:inline-block; }
+  </style>
+</head>
+<body>
+  <a href="/index.html">← 목록으로</a>
+  <h1 id="title">응시</h1>
+  <div class="row">
+    <a id="btnPaper" class="btn" href="#">문제지 다운로드</a>
+    <a id="btnSolution" class="btn" href="#">해설 다운로드</a>
+  </div>
+
+  <div id="qs"></div>
+
+  <button id="submit">채점하기</button>
+  <h2 id="score"></h2>
+  <div id="detail"></div>
+
+  <script>
+    function getParam(name){ return new URLSearchParams(location.search).get(name); }
+    async function fetchJSON(url){ const r=await fetch(url); if(!r.ok) throw new Error(url); return r.json(); }
+    function normalize(s, rules){
+      if (s == null) return '';
+      let t = String(s);
+      if (rules?.trim) t = t.trim();
+      if (rules?.lower) t = t.toLowerCase();
+      if (rules?.whitespace === 'collapse') t = t.replace(/\s+/g,' ');
+      if (rules?.aliases && rules.aliases[t] != null) t = rules.aliases[t];
+      return t;
+    }
+
+    (async () => {
+      const slug = getParam('slug');
+      if (!slug) { document.body.innerHTML='잘못된 접근'; return; }
+
+      const meta = await fetchJSON(`/exams/${slug}/meta.json`);
+      document.getElementById('title').textContent = meta.title;
+
+      // 다운로드 버튼(카운트 증가 경유)
+      document.getElementById('btnPaper').onclick = async (e)=>{ e.preventDefault(); 
+        const r=await fetch(`/api/download?exam=${slug}&type=paper`); const j=await r.json(); location.href=j.redirect; };
+      document.getElementById('btnSolution').onclick = async (e)=>{ e.preventDefault(); 
+        const r=await fetch(`/api/download?exam=${slug}&type=solution`); const j=await r.json(); location.href=j.redirect; };
+
+      const ans = await fetchJSON(`/exams/${slug}/answers.json`);
+      const answers = ans.answers; const rules = ans.normalize || {};
+      const N = meta.numQuestions;
+
+      const qs = document.getElementById('qs');
+      for (let i=1;i<=N;i++){
+        const div=document.createElement('div'); div.className='q';
+        div.innerHTML = `
+          <div><strong>${i}번</strong></div>
+          <input type="text" placeholder="정답 입력(예: 3 또는 -2)" data-q="${i}" />
+        `;
+        qs.appendChild(div);
+      }
+
+      document.getElementById('submit').onclick = () => {
+        let correct = 0; const detail=[];
+        for (let i=1;i<=N;i++){
+          const el = document.querySelector(`input[data-q="${i}"]`);
+          const user = normalize(el.value, rules);
+          const key  = normalize(answers[String(i)], rules);
+          const ok = user !== '' && user === key;
+          if (ok) correct++;
+          detail.push({ i, user, key, ok });
+        }
+        const point = ans.scoring?.correct ?? 1;
+        const wrongp = ans.scoring?.wrong ?? 0;
+        const score = correct*point + (N-correct)*wrongp;
+
+        document.getElementById('score').textContent = `점수: ${score} / ${N*point} (정답 ${correct}개)`;
+        const d = document.getElementById('detail'); d.innerHTML='';
+        for (const row of detail){
+          const p = document.createElement('p');
+          p.innerHTML = `${row.i}번 — <span class="${row.ok?'ok':'no'}">${row.ok?'정답':'오답'}</span> (입력: ${row.user || '—'}, 정답: ${row.key})`;
+          d.appendChild(p);
+        }
+      };
+    })();
+  </script>
+</body>
+</html>

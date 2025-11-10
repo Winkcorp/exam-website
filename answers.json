@@ -1,0 +1,22 @@
+{
+  "answers": {
+    "1": "4",
+    "2": "2",
+    "3": "1",
+    "4": "3",
+    "5": "-2"
+  },
+  "scoring": {
+    "correct": 1,
+    "wrong": 0
+  },
+  "normalize": {
+    "trim": true,
+    "lower": true,
+    "whitespace": "collapse",
+    "aliases": {
+      "−2": "-2",
+      " -2 ": "-2"
+    }
+  }
+}

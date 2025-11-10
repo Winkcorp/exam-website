@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>모의고사 목록</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 860px; margin: 32px auto; padding: 0 16px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .btn { padding: 8px 12px; border-radius: 8px; border: 1px solid #d1d5db; text-decoration: none; display:inline-block; }
+    .count { margin-left:auto;color:#6b7280; }
+  </style>
+</head>
+<body>
+  <h1>모의고사</h1>
+  <div id="list"></div>
+
+  <script>
+    async function fetchJSON(url){ const r=await fetch(url); if(!r.ok) throw new Error(url); return r.json(); }
+    function statsUrl(slug){ return `/api/stats?exam=${encodeURIComponent(slug)}`; }
+    function dlUrl(slug, type){ return `/api/download?exam=${encodeURIComponent(slug)}&type=${type}`; }
+
+    (async () => {
+      const exams = await fetchJSON('./exams.json');
+      const list = document.getElementById('list');
+
+      for (const ex of exams) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <h2>${ex.title}</h2>
+          <p>${ex.description || ''}</p>
+          <div class="row">
+            <a class="btn" href="/exam.html?slug=${encodeURIComponent(ex.slug)}">응시하기</a>
+            <a class="btn" href="#" data-dl="paper">문제지 다운로드</a>
+            <a class="btn" href="#" data-dl="solution">해설지 다운로드</a>
+            <span id="counts-${ex.slug}" class="count">불러오는 중…</span>
+          </div>
+        `;
+        list.appendChild(card);
+
+        // 버튼 클릭 시 카운트 증가 + 리다이렉트
+        card.querySelectorAll('[data-dl]').forEach(el => {
+          el.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const type = el.getAttribute('data-dl');
+            try {
+              const r = await fetch(dlUrl(ex.slug, type));
+              if (!r.ok) { alert('다운로드 오류'); return; }
+              const { redirect } = await r.json();
+              location.href = redirect;
+            } catch (err) {
+              alert('네트워크 오류');
+            }
+          });
+        });
+
+        // 카운트 표시
+        try {
+          const s = await fetchJSON(statsUrl(ex.slug));
+          const t = card.querySelector(`#counts-${ex.slug}`);
+          t.textContent = `문제지 ${s.paper||0}회 · 해설 ${s.solution||0}회 다운로드`;
+        } catch { /* 무시 */ }
+      }
+    })();
+  </script>
+</body>
+</html>
